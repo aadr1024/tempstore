@@ -8,6 +8,21 @@ MAX_SIZE_KB=100  # warn if file exceeds this
 
 mkdir -p "$STORE_DIR"
 
+# Convert file timestamp to relative time
+relative_time() {
+    local file="$1"
+    local now=$(date +%s)
+    local file_time=$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file" 2>/dev/null)
+    local diff=$((now - file_time))
+
+    if (( diff < 60 )); then echo "${diff}s ago"
+    elif (( diff < 3600 )); then echo "$((diff / 60))m ago"
+    elif (( diff < 86400 )); then echo "$((diff / 3600))h ago"
+    elif (( diff < 604800 )); then echo "$((diff / 86400))d ago"
+    else echo "$((diff / 604800))w ago"
+    fi
+}
+
 # Save mode
 if [[ $# -gt 0 ]]; then
     file="$STORE_DIR/$(date +%Y%m%d_%H%M%S)"
@@ -54,12 +69,24 @@ if [[ -z "$(ls -A "$STORE_DIR" 2>/dev/null)" ]]; then
     exit 0
 fi
 
+# Build list with relative times
+build_list() {
+    for f in $(ls -t "$STORE_DIR"); do
+        local time=$(relative_time "$STORE_DIR/$f")
+        local preview=$(head -c 60 "$STORE_DIR/$f" | tr '\n' ' ')
+        printf "%-8s %s|%s\n" "$time" "$preview" "$f"
+    done
+}
+
 # fzf picker - sorted by most recent, ctrl-d to delete
-selected=$(ls -t "$STORE_DIR" | fzf \
-    --preview "cat '$STORE_DIR/{}'" \
+selected=$(build_list | fzf \
+    --preview "cat '$STORE_DIR/{-1}'" \
     --preview-window=up:5:wrap \
     --header="Enter=copy  ctrl-d=delete" \
-    --bind="ctrl-d:execute(rm '$STORE_DIR/{}')+reload(ls -t '$STORE_DIR')")
+    --delimiter='\|' \
+    --with-nth=1 \
+    --bind="ctrl-d:execute(rm '$STORE_DIR/{-1}')+reload(for f in \$(ls -t '$STORE_DIR'); do t=\$(stat -f %m '$STORE_DIR/'\$f); now=\$(date +%s); d=\$((now-t)); if (( d<60 )); then p=\"\${d}s ago\"; elif (( d<3600 )); then p=\"\$((d/60))m ago\"; elif (( d<86400 )); then p=\"\$((d/3600))h ago\"; else p=\"\$((d/86400))d ago\"; fi; preview=\$(head -c 60 '$STORE_DIR/'\$f | tr '\n' ' '); printf '%-8s %s|%s\n' \"\$p\" \"\$preview\" \$f; done)" \
+    | cut -d'|' -f2)
 
 if [[ -n "$selected" && -f "$STORE_DIR/$selected" ]]; then
     cat "$STORE_DIR/$selected" | pbcopy

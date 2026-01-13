@@ -78,8 +78,9 @@ build_list() {
     done
 }
 
-# fzf picker - sorted by most recent, ctrl-d to delete
+# fzf picker - sorted by most recent (first item focused), ctrl-d to delete
 selected=$(build_list | fzf \
+    --no-sort \
     --preview "cat '$STORE_DIR/{-1}'" \
     --preview-window=up:5:wrap \
     --header="Enter=copy  ctrl-d=delete" \

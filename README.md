@@ -5,7 +5,7 @@ Quick terminal snippet storage. Save text, retrieve it later with fuzzy search.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aadityarajesh/tempstore/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/aadr1024/tempstore/main/install.sh | bash
 ```
 
 Requires: [fzf](https://github.com/junegunn/fzf) (`brew install fzf`)

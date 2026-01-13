@@ -4,7 +4,7 @@
 set -e
 
 INSTALL_DIR="$HOME/.local/bin"
-SCRIPT_URL="https://raw.githubusercontent.com/aadityarajesh/tempstore/main/tempstore"
+SCRIPT_URL="https://raw.githubusercontent.com/aadr1024/tempstore/main/tempstore"
 
 echo "Installing tempstore..."
 

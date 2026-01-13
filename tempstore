@@ -1,0 +1,67 @@
+#!/bin/bash
+# tempstore - quick snippet storage with fzf
+# Usage: tempstore <text>  - save
+#        tempstore         - pick & copy (ctrl-d to delete)
+
+STORE_DIR="${TEMPSTORE_DIR:-$HOME/.tempstore}"
+MAX_SIZE_KB=100  # warn if file exceeds this
+
+mkdir -p "$STORE_DIR"
+
+# Save mode
+if [[ $# -gt 0 ]]; then
+    file="$STORE_DIR/$(date +%Y%m%d_%H%M%S)"
+    echo "$*" > "$file"
+    size=$(du -k "$file" | cut -f1)
+    if (( size > MAX_SIZE_KB )); then
+        echo "Warning: stored ${size}KB (exceeds ${MAX_SIZE_KB}KB limit)"
+        read -p "Keep anyway? [y/N] " -n 1 -r
+        echo
+        [[ ! $REPLY =~ ^[Yy]$ ]] && rm "$file" && echo "Deleted." && exit 1
+    fi
+    echo "Saved (${size}KB)"
+    exit 0
+fi
+
+# Retrieve mode - check for large files first
+large_files=$(find "$STORE_DIR" -type f -size +${MAX_SIZE_KB}k 2>/dev/null)
+if [[ -n "$large_files" ]]; then
+    count=$(echo "$large_files" | wc -l | tr -d ' ')
+    echo "Found $count large file(s) (>${MAX_SIZE_KB}KB). Opening cleanup view..."
+    echo
+
+    # Show large files in fzf with multi-select for deletion
+    to_delete=$(echo "$large_files" | while read f; do
+        size=$(du -h "$f" | cut -f1)
+        echo "$size|$f"
+    done | fzf --multi \
+        --preview "cat {2}" \
+        --preview-window=up:5:wrap \
+        --header="TAB=select  Enter=delete selected  Esc=skip" \
+        --delimiter='|' \
+        --with-nth=1,2 \
+        | cut -d'|' -f2)
+
+    if [[ -n "$to_delete" ]]; then
+        echo "$to_delete" | xargs rm
+        echo "Deleted $(echo "$to_delete" | wc -l | tr -d ' ') file(s)."
+    fi
+fi
+
+# Check if store is empty
+if [[ -z "$(ls -A "$STORE_DIR" 2>/dev/null)" ]]; then
+    echo "No stored items. Use: tempstore <text>"
+    exit 0
+fi
+
+# fzf picker - sorted by most recent, ctrl-d to delete
+selected=$(ls -t "$STORE_DIR" | fzf \
+    --preview "cat '$STORE_DIR/{}'" \
+    --preview-window=up:5:wrap \
+    --header="Enter=copy  ctrl-d=delete" \
+    --bind="ctrl-d:execute(rm '$STORE_DIR/{}')+reload(ls -t '$STORE_DIR')")
+
+if [[ -n "$selected" && -f "$STORE_DIR/$selected" ]]; then
+    cat "$STORE_DIR/$selected" | pbcopy
+    echo "Copied!"
+fi
